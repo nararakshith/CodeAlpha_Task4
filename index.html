@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3f6f2">
+  <title>Jarvis — a little conversation</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202b29;
+      --muted: #78817e;
+      --line: #e5eae5;
+      --paper: #ffffff;
+      --ground: #f3f6f2;
+      --green: #1936c9;
+      --green-dark: #1936c9;
+      --green-pale: #eaf2ed;
+      --coral: #d9785d;
+      --shadow: 0 20px 65px rgb(33 53 44 / 9%);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      color: var(--ink);
+      background-color: var(--ground);
+      background-image: radial-gradient(#d9e2da 0.7px, transparent 0.7px);
+      background-size: 19px 19px;
+      font-family: "DM Sans", sans-serif;
+    }
+
+    button, textarea { font: inherit; }
+    button { color: inherit; }
+
+    .page {
+      display: grid;
+      min-height: 100vh;
+      place-items: center;
+      padding: 34px 22px;
+    }
+
+    .chat {
+      display: flex;
+      width: min(100%, 920px);
+      height: min(790px, calc(100vh - 68px));
+      min-height: 540px;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid rgb(215 224 216 / 90%);
+      border-radius: 14px;
+      background: var(--paper);
+      box-shadow: var(--shadow);
+      animation: arrive 500ms ease-out both;
+    }
+
+    .topbar {
+      display: flex;
+      min-height: 76px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 0 27px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .identity { display: flex; align-items: center; gap: 13px; }
+
+    .avatar {
+      display: grid;
+      width: 43px;
+      height: 43px;
+      flex: 0 0 auto;
+      place-items: center;
+      border-radius: 13px;
+      color: #fff;
+      background: var(--green);
+      font-family: "Newsreader", serif;
+      font-size: 25px;
+    }
+
+    .name {
+      margin: 0;
+      font-family: "Newsreader", serif;
+      font-size: 23px;
+      font-weight: 600;
+      line-height: 1.05;
+    }
+
+    .presence { display: flex; align-items: center; gap: 7px; margin-top: 5px; color: var(--muted); font-size: 12px; }
+    .presence-dot { width: 7px; height: 7px; border-radius: 50%; background: #6aa17c; box-shadow: 0 0 0 3px #e8f2e9; }
+
+    .reset {
+      display: inline-flex;
+      width: 39px;
+      height: 39px;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #fff;
+      cursor: pointer;
+      transition: background 150ms ease, border-color 150ms ease;
+    }
+
+    .reset:hover { border-color: #bdcfc3; background: #f7faf7; }
+    .reset:focus-visible, .send:focus-visible, .suggestion:focus-visible, textarea:focus-visible { outline: 3px solid #a9c7b5; outline-offset: 2px; }
+
+    .conversation {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      gap: 22px;
+      overflow-y: auto;
+      padding: 29px clamp(18px, 6vw, 72px) 24px;
+      scroll-behavior: smooth;
+    }
+
+    .date-label {
+      align-self: center;
+      margin: 1px 0 1px;
+      color: #9aa29e;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+    }
+
+    .message-row { display: flex; align-items: flex-end; gap: 10px; animation: message-in 220ms ease-out both; }
+    .message-row.user { justify-content: flex-end; }
+
+    .mini-avatar {
+      display: grid;
+      width: 27px;
+      height: 27px;
+      flex: 0 0 auto;
+      place-items: center;
+      border-radius: 9px;
+      color: white;
+      background: var(--green);
+      font-family: "Newsreader", serif;
+      font-size: 16px;
+    }
+
+    .bubble {
+      max-width: min(75%, 510px);
+      padding: 13px 16px;
+      border: 1px solid #e8ece8;
+      border-radius: 13px 13px 13px 4px;
+      background: #f7f9f7;
+      font-size: 14px;
+      line-height: 1.65;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+
+    .user .bubble { border-color: var(--green); border-radius: 13px 13px 4px 13px; color: white; background: var(--green); }
+
+    .typing {
+      display: flex;
+      width: fit-content;
+      align-items: center;
+      gap: 5px;
+      padding: 14px 16px;
+      border: 1px solid #e8ece8;
+      border-radius: 13px 13px 13px 4px;
+      background: #f7f9f7;
+    }
+
+    .typing span { width: 5px; height: 5px; border-radius: 50%; background: #89968e; animation: pulse 1s infinite ease-in-out; }
+    .typing span:nth-child(2) { animation-delay: 120ms; }
+    .typing span:nth-child(3) { animation-delay: 240ms; }
+
+    .suggestions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 clamp(18px, 6vw, 72px) 18px; }
+
+    .suggestion {
+      padding: 8px 12px;
+      border: 1px solid #dce6de;
+      border-radius: 999px;
+      color: #1acc76;
+      background: #f8fbf8;
+      cursor: pointer;
+      font-size: 12px;
+      transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+    }
+
+    .suggestion:hover { transform: translateY(-1px); border-color: #aac0b1; background: var(--green-pale); }
+
+    .composer-wrap { padding: 0 clamp(18px, 6vw, 72px) 20px; }
+
+    .composer {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      padding: 9px 10px 9px 16px;
+      border: 1px solid #dce3dd;
+      border-radius: 12px;
+      background: #fff;
+      transition: border-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    .composer:focus-within { border-color: #9db7a5; box-shadow: 0 0 0 3px rgb(96 137 111 / 10%); }
+
+    textarea {
+      width: 100%;
+      max-height: 120px;
+      min-height: 40px;
+      resize: none;
+      padding: 10px 0;
+      border: 0;
+      outline: 0;
+      color: var(--ink);
+      background: transparent;
+      font-size: 14px;
+      line-height: 20px;
+    }
+
+    textarea::placeholder { color: #9ba49e; }
+
+    .send {
+      display: grid;
+      width: 40px;
+      height: 40px;
+      flex: 0 0 auto;
+      place-items: center;
+      border: 0;
+      border-radius: 9px;
+      color: white;
+      background: var(--green);
+      cursor: pointer;
+      transition: background 150ms ease, transform 150ms ease;
+    }
+
+    .send:hover { transform: translateY(-1px); background: var(--green-dark); }
+    .send:disabled { cursor: default; opacity: 0.5; transform: none; }
+    .hint { margin: 10px 0 0; color: #9aa29e; font-size: 10px; text-align: center; }
+
+    @keyframes arrive { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes message-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse { 0%, 60%, 100% { opacity: 0.38; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+
+    @media (max-width: 600px) {
+      .page { padding: 0; }
+      .chat { width: 100%; height: 100dvh; min-height: 430px; border: 0; border-radius: 0; }
+      .topbar { min-height: 68px; padding: 0 18px; }
+      .conversation { gap: 18px; padding-top: 23px; }
+      .bubble { max-width: 84%; }
+      .composer-wrap { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+      .hint { display: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    }
+
+    body { background: #f4f6f4; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+
+    .page {
+      height: 100vh;
+      height: 100dvh;
+      grid-template-columns: minmax(0, 1fr);
+      place-items: stretch;
+      padding: 0;
+      background: #f4f6f4;
+    }
+
+    .chat { width: 100%; height: auto; min-height: 0; border: 0; border-radius: 0; background: #fff; box-shadow: none; animation: none; }
+    .topbar { min-height: 66px; padding: 0 clamp(20px, 4vw, 48px); }
+    .topbar .identity { gap: 0; }
+    .topbar .name { font-family: inherit; font-size: 15px; font-weight: 600; line-height: 1.3; }
+    .topbar .presence { margin-top: 2px; font-size: 11px; }
+    .conversation { gap: 23px; padding: 27px 0 30px; background: #fff; }
+    .date-label { width: min(calc(100% - 40px), 760px); margin: 0 auto; text-align: center; }
+    .message-row { width: min(calc(100% - 40px), 760px); margin-inline: auto; }
+    .mini-avatar { width: 29px; height: 29px; border-radius: 8px; font-family: inherit; font-size: 13px; font-weight: 650; line-height: 1; }
+    .bubble { max-width: min(78%, 560px); padding: 7px 0; border: 0; border-radius: 0; background: transparent; font-size: 14px; line-height: 1.7; }
+    .user .bubble { padding: 10px 14px; border: 1px solid #e1e8e2; border-radius: 9px; color: #26382f; background: #eff4f0; }
+    .typing { border: 0; border-radius: 0; background: transparent; }
+    .suggestions { width: min(calc(100% - 40px), 760px); margin: 0 auto; padding: 0 0 14px; }
+    .suggestion { border-radius: 7px; color: #4a6454; background: #fff; font-size: 12px; }
+    .composer-wrap { padding: 0 max(20px, calc((100% - 760px) / 2)) 16px; background: #fff; }
+    .composer { border-radius: 9px; }
+    .hint { font-size: 10px; }
+    .avatar, .name, .mini-avatar { font-family: inherit; }
+    .topbar .reset { flex: 0 0 auto; }
+
+    @media (max-width: 680px) {
+      .chat { height: 100dvh; }
+      .topbar { min-height: 58px; padding: 0 17px; }
+      .conversation { gap: 18px; padding-top: 21px; }
+      .message-row, .suggestions { width: calc(100% - 32px); }
+      .bubble { max-width: 84%; }
+      .composer-wrap { padding: 0 16px max(13px, env(safe-area-inset-bottom)); }
+      .hint { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="chat" aria-label="Chat with Jarvis">
+      <header class="topbar">
+        <div class="identity">
+          <div>
+            <h1 class="name">Conversation</h1>
+            <div class="presence"><span class="presence-dot" aria-hidden="true"></span>Jarvis is ready</div>
+          </div>
+        </div>
+        <button class="reset" id="reset" type="button" title="Start a new conversation" aria-label="Start a new conversation">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </header>
+
+      <div class="conversation" id="conversation" role="log" aria-live="polite" aria-relevant="additions text">
+        <p class="date-label">A new conversation</p>
+      </div>
+
+      <div class="suggestions" id="suggestions" aria-label="Suggested messages">
+        <button class="suggestion" type="button">Tell me something fun</button>
+        <button class="suggestion" type="button">I'm having a rough day</button>
+        <button class="suggestion" type="button">What can you do?</button>
+      </div>
+
+      <form class="composer-wrap" id="chat-form">
+        <div class="composer">
+          <textarea id="message-input" rows="1" maxlength="1000" placeholder="Write something…" aria-label="Your message" required></textarea>
+          <button class="send" id="send" type="submit" aria-label="Send message" title="Send message">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+          </button>
+        </div>
+        <p class="hint">Enter to send · Shift + Enter for a new line</p>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    const conversation = document.querySelector("#conversation");
+    const form = document.querySelector("#chat-form");
+    const input = document.querySelector("#message-input");
+    const sendButton = document.querySelector("#send");
+    const suggestions = document.querySelector("#suggestions");
+    const storageKey = "juniper-chat-v1";
+    const state = { name: "", mood: "", lastTopic: "" };
+
+    const replies = {
+      greeting: ["Hey! What’s on your mind?", "Hi there. How’s your day going?", "Hello! I’m glad you stopped by."],
+      howAreYou: ["I’m doing well, thanks for asking. How about you?", "Pretty good, especially now that we’re chatting. How are you?"],
+      joke: ["I tried to organize a hide-and-seek tournament, but it was hard to find good players.", "Why did the bicycle fall over? It was two-tired. I’ll see myself out."],
+      thanks: ["You’re welcome!", "Anytime. What else is on your mind?", "Of course, happy to help."],
+      fallback: ["I’m listening. Tell me a little more?", "That’s interesting. What part of it has been on your mind most?", "I’m not quite sure I follow yet, but I’d like to. Can you say a bit more?"]
+    };
+
+    function choose(items) {
+      return items[Math.floor(Math.random() * items.length)];
+    }
+
+    function addMessage(text, sender, save = true) {
+      const row = document.createElement("div");
+      row.className = `message-row ${sender}`;
+
+      if (sender === "bot") {
+        const avatar = document.createElement("span");
+        avatar.className = "mini-avatar";
+        avatar.setAttribute("aria-hidden", "true");
+        avatar.textContent = "J";
+        row.append(avatar);
+      }
+
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.textContent = text;
+      row.append(bubble);
+      conversation.append(row);
+      conversation.scrollTop = conversation.scrollHeight;
+
+      if (save) {
+        const history = JSON.parse(localStorage.getItem(storageKey) || "[]");
+        history.push({ text, sender });
+        localStorage.setItem(storageKey, JSON.stringify(history.slice(-80)));
+      }
+    }
+
+    function respond(message) {
+      const normalized = message.toLowerCase().replace(/[’']/g, "'").trim();
+      const nameMatch = normalized.match(/\b(?:my name is|i'm|i am|call me)\s+([a-z][a-z'-]{0,24})\b/);
+      if (nameMatch) {
+        state.name = nameMatch[1].replace(/^./, letter => letter.toUpperCase());
+        return `Nice to meet you, ${state.name}. What would you like to talk about?`;
+      }
+
+      if (/\b(?:hello|hi|hey|good morning|good afternoon|good evening)\b/.test(normalized)) {
+        return state.name ? `Hey, ${state.name}! What’s on your mind?` : choose(replies.greeting);
+      }
+
+      if (/\bhow are you\b|\bhow're you\b/.test(normalized)) return choose(replies.howAreYou);
+      if (/\b(?:your name|who are you)\b/.test(normalized)) return "I’m Jarvis. I’m a little rule-based chatbot, but I’m always up for a conversation.";
+      if (/\b(?:what can you do|help|how does this work)\b/.test(normalized)) return "I can chat about your day, remember your name during this conversation, tell a joke, or just listen. I’m still learning, so feel free to steer me.";
+      if (/\b(?:joke|something fun|make me laugh)\b/.test(normalized)) return choose(replies.joke);
+      if (/\b(?:thank you|thanks|thx)\b/.test(normalized)) return choose(replies.thanks);
+      if (/\b(?:bye|goodbye|see you|gotta go)\b/.test(normalized)) return state.name ? `Take care, ${state.name}. It was nice talking with you.` : "Take care! It was nice talking with you.";
+
+      if (/\b(?:sad|rough|bad|hard|tough|awful|upset|stressed|anxious|lonely|overwhelmed)\b/.test(normalized)) {
+        state.mood = "low";
+        return "I’m sorry it’s feeling rough right now. Do you want to talk about what happened, or would a small distraction feel better?";
+      }
+
+      if (/\b(?:good|great|happy|excited|wonderful|pretty well|amazing)\b/.test(normalized) && /\b(?:i'm|i am|feeling|day|doing)\b/.test(normalized)) {
+        state.mood = "good";
+        return "That’s lovely to hear. What’s been the best part?";
+      }
+
+      if (/\b(?:work|job|school|study|meeting|boss|class)\b/.test(normalized)) {
+        state.lastTopic = "work";
+        return "Work and school can take up so much headspace. Is something specific happening, or is it more the general load?";
+      }
+
+      if (/\b(?:family|friend|partner|relationship|roommate)\b/.test(normalized)) {
+        state.lastTopic = "relationships";
+        return "Relationships can bring up a lot. What’s been going on between you two?";
+      }
+
+      if (/\b(?:yes|yeah|yep|sure|okay|ok)\b/.test(normalized) && state.mood === "low") return "I’m here. Take your time. What’s been weighing on you?";
+      if (/\b(?:no|not really|nah)\b/.test(normalized) && state.mood === "low") return "That’s okay. We can talk about something else, or just take it one message at a time.";
+      if (normalized.includes("?")) return "That’s a good question. I don’t know everything, but I can think it through with you. What have you considered so far?";
+      if (state.name && /\b(?:i'm|i am)\b/.test(normalized)) return `I hear you, ${state.name}. What makes you feel that way?`;
+      return choose(replies.fallback);
+    }
+
+    function showTyping() {
+      const row = document.createElement("div");
+      row.className = "message-row";
+      row.id = "typing-indicator";
+      const avatar = document.createElement("span");
+      avatar.className = "mini-avatar";
+      avatar.setAttribute("aria-hidden", "true");
+      avatar.textContent = "j";
+      const dots = document.createElement("div");
+      dots.className = "typing";
+      dots.setAttribute("aria-label", "Jarvis is typing");
+      dots.innerHTML = "<span></span><span></span><span></span>";
+      row.append(avatar, dots);
+      conversation.append(row);
+      conversation.scrollTop = conversation.scrollHeight;
+      return row;
+    }
+
+    function restoreConversation() {
+      const history = JSON.parse(localStorage.getItem(storageKey) || "[]").map(({ text, sender }) => ({
+        text: text.replace(/\bJuniper\b/g, "Jarvis"),
+        sender
+      }));
+      if (history.length) {
+        localStorage.setItem(storageKey, JSON.stringify(history));
+        history.forEach(({ text, sender }) => addMessage(text, sender, false));
+      } else {
+        addMessage("Hey, I’m Jarvis. How are you doing today?", "bot");
+      }
+    }
+
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+      const message = input.value.trim();
+      if (!message) return;
+
+      addMessage(message, "user");
+      input.value = "";
+      input.style.height = "auto";
+      sendButton.disabled = true;
+      const typing = showTyping();
+      window.setTimeout(() => {
+        typing.remove();
+        addMessage(respond(message), "bot");
+        sendButton.disabled = false;
+        input.focus();
+      }, 550 + Math.random() * 650);
+    });
+
+    input.addEventListener("input", () => {
+      input.style.height = "auto";
+      input.style.height = `${Math.min(input.scrollHeight, 120)}px`;
+    });
+
+    input.addEventListener("keydown", event => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        form.requestSubmit();
+      }
+    });
+
+    suggestions.addEventListener("click", event => {
+      const button = event.target.closest("button");
+      if (!button) return;
+      input.value = button.textContent;
+      form.requestSubmit();
+    });
+
+    document.querySelector("#reset").addEventListener("click", () => {
+      localStorage.removeItem(storageKey);
+      state.name = "";
+      state.mood = "";
+      state.lastTopic = "";
+      conversation.innerHTML = '<p class="date-label">A new conversation</p>';
+      addMessage("Hey, I’m Jarvis. How are you doing today?", "bot");
+      input.focus();
+    });
+
+    restoreConversation();
+  </script>
+</body>
+</html>
