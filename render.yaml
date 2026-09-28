@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: jarvis-chatbot
+    runtime: static
+    buildCommand: echo "Publishing static website"
+    staticPublishPath: .
